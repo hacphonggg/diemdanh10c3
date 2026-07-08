@@ -2,8 +2,17 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Điểm danh</title>
+<!-- PWA / cài lên màn hình chính -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Điểm danh">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
 <script src="vendor/xlsx.full.min.js"></script>
 <style>
   :root{
@@ -195,9 +204,9 @@
    ============================================================ */
 const TABS = [
   {
-    id:"10c3", label:"📋 Lớp 10C3", type:"class", title:"10C3", ver:2,
+    id:"10c3", label:"📋 Lớp 10C3", type:"class", title:"10C3", ver:3,
     groupOptions:["NT","BT","2B"], defaultGroup:"BT",
-    students:[{"ho":"PHÙNG THIÊN","ten":"AN","grp":"NT"},{"ho":"ĐỖ HỮU PHÚC","ten":"AN","grp":"BT"},{"ho":"PHẠM TRÂM","ten":"ANH","grp":"BT"},{"ho":"LÊ QUANG DUY","ten":"CHƯƠNG","grp":"BT"},{"ho":"PHẠM QUỐC","ten":"CƯỜNG","grp":"NT"},{"ho":"HUỲNH MẪN","ten":"DUỆ","grp":"NT"},{"ho":"LÊ PHAN GIA","ten":"HÀO","grp":"BT"},{"ho":"TRẦN NGỌC KHÁNH","ten":"HIỀN","grp":"NT"},{"ho":"NGUYỄN HUY","ten":"HOÀNG","grp":"NT"},{"ho":"TRẦN NGUYỄN AN","ten":"HOÀNG","grp":"NT"},{"ho":"KHUẤT XUÂN","ten":"HÙNG","grp":"NT"},{"ho":"LÊ ĐOÀN GIA","ten":"HUY","grp":"NT"},{"ho":"ĐOÀN HỮU","ten":"KHANG","grp":"NT"},{"ho":"CAO MINH","ten":"KHOA","grp":"BT"},{"ho":"TRẦN NGỌC HOÀNG","ten":"LONG","grp":"NT"},{"ho":"NGUYỄN THANH THẢO","ten":"MY","grp":"BT"},{"ho":"HOÀNG VIỆT","ten":"NGA","grp":"NT"},{"ho":"VÕ TRỌNG","ten":"NGHĨA","grp":"NT"},{"ho":"CAO THÀNH","ten":"NGHĨA","grp":"2B"},{"ho":"MAI THÀNH","ten":"NHÂN","grp":"NT"},{"ho":"ĐINH NGUYỄN PHƯƠNG","ten":"NHI","grp":"BT"},{"ho":"NGUYỄN LÊ THIÊN","ten":"PHÚC","grp":"BT"},{"ho":"TRẦN HOÀNG","ten":"PHÚC","grp":"NT"},{"ho":"NGUYỄN CHÍ DUY","ten":"QUÂN","grp":"BT"},{"ho":"TRẦN LÊ","ten":"QUANG","grp":"BT"},{"ho":"NGUYỄN TẤN","ten":"SANG","grp":"NT"},{"ho":"TRẦN PHONG","ten":"SƠN","grp":"NT"},{"ho":"TRƯƠNG QUỐC","ten":"THÁI","grp":"NT"},{"ho":"VŨ ĐỨC","ten":"THẮNG","grp":"NT"},{"ho":"VŨ HOA HOÀNG","ten":"THỊNH","grp":"NT"},{"ho":"LÂM TÚ","ten":"TRINH","grp":"BT"},{"ho":"NGUYỄN LÊ BẢO","ten":"TRÚC","grp":"BT"},{"ho":"NGUYỄN GIA","ten":"TUẤN","grp":"BT"},{"ho":"PHẠM NHÃ","ten":"UYÊN","grp":"NT"},{"ho":"NGUYỄN GIA","ten":"KHIÊM","grp":"BT"},{"ho":"LƯƠNG KHÁNH","ten":"HÀ","grp":"BT"},{"ho":"NGUYỄN ĐÌNH","ten":"QUỐC","grp":"BT"},{"ho":"LÊ NGUYỄN NGỌC","ten":"TÚ","grp":"BT"}]
+    students:[{"ho":"PHÙNG THIÊN","ten":"AN","grp":"NT"},{"ho":"PHẠM TRÂM","ten":"ANH","grp":"BT"},{"ho":"LÊ QUANG DUY","ten":"CHƯƠNG","grp":"BT"},{"ho":"PHẠM QUỐC","ten":"CƯỜNG","grp":"NT"},{"ho":"HUỲNH MẪN","ten":"DUỆ","grp":"BT"},{"ho":"LÊ PHAN GIA","ten":"HÀO","grp":"BT"},{"ho":"TRẦN NGỌC KHÁNH","ten":"HIỀN","grp":"NT"},{"ho":"NGUYỄN HUY","ten":"HOÀNG","grp":"NT"},{"ho":"TRẦN NGUYỄN AN","ten":"HOÀNG","grp":"NT"},{"ho":"KHUẤT XUÂN","ten":"HÙNG","grp":"NT"},{"ho":"ĐOÀN HỮU","ten":"KHANG","grp":"NT"},{"ho":"CAO MINH","ten":"KHOA","grp":"BT"},{"ho":"TRẦN NGỌC HOÀNG","ten":"LONG","grp":"NT"},{"ho":"NGUYỄN THANH THẢO","ten":"MY","grp":"BT"},{"ho":"HOÀNG VIỆT","ten":"NGA","grp":"NT"},{"ho":"VÕ TRỌNG","ten":"NGHĨA","grp":"NT"},{"ho":"CAO THÀNH","ten":"NGHĨA","grp":"2B"},{"ho":"MAI THÀNH","ten":"NHÂN","grp":"NT"},{"ho":"ĐINH NGUYỄN PHƯƠNG","ten":"NHI","grp":"BT"},{"ho":"NGUYỄN LÊ THIÊN","ten":"PHÚC","grp":"BT"},{"ho":"TRẦN HOÀNG","ten":"PHÚC","grp":"NT"},{"ho":"NGUYỄN CHÍ DUY","ten":"QUÂN","grp":"BT"},{"ho":"TRẦN LÊ","ten":"QUANG","grp":"BT"},{"ho":"NGUYỄN TẤN","ten":"SANG","grp":"NT"},{"ho":"TRẦN PHONG","ten":"SƠN","grp":"NT"},{"ho":"TRƯƠNG QUỐC","ten":"THÁI","grp":"NT"},{"ho":"VŨ ĐỨC","ten":"THẮNG","grp":"NT"},{"ho":"VŨ HOA HOÀNG","ten":"THỊNH","grp":"NT"},{"ho":"NGUYỄN GIA","ten":"TUẤN","grp":"BT"},{"ho":"PHẠM NHÃ","ten":"UYÊN","grp":"NT"},{"ho":"LƯƠNG KHÁNH","ten":"HÀ","grp":"BT"},{"ho":"NGUYỄN ĐÌNH","ten":"QUỐC","grp":"2B"},{"ho":"NGUYỄN TƯỜNG","ten":"VI","grp":"BT"},{"ho":"ĐẶNG BÁ LONG","ten":"PHI","grp":"BT"},{"ho":"NGUYỄN HỒ TÙNG","ten":"LÂM","grp":"BT"}]
   },
   {
     id:"nap106", label:"🛏️ Ngủ trưa P106", type:"nap", title:"106", ver:1,
@@ -382,7 +391,7 @@ function update(){
       `</div>`;
     let vang="Vắng: "+absent;
     if(absent>0) vang+=" ("+absentList.map(s=>s.short+" "+s.grp).join(", ")+")";
-    setReport("Lớp "+c.title+"\nSS: "+presentCount+"/"+total+"\n"+vang+"\nĂn trưa: "+lunch);
+    setReport(dateHeader()+"\nLớp "+c.title+"\nSS: "+presentCount+"/"+total+"\n"+vang+"\nĂn trưa: "+lunch);
   }else{
     // NAP: gom theo lớp
     const order=[]; st.students.forEach(s=>{ if(!order.includes(s.grp)) order.push(s.grp); });
@@ -394,11 +403,21 @@ function update(){
     $("#summaryBox").innerHTML=
       `<div class="grid">`+stat("tot","Sĩ số",total)+stat("pre","Có mặt",presentCount)+stat("abs","Vắng",absent)+`</div>`+
       `<div class="sub-abs">`+perClass.map(p=>mini("Vắng "+p.grp+" ("+p.total+")",p.absentNames.length)).join("")+`</div>`;
-    let lines=["P"+c.title+" "+presentCount+"/"+total+" vắng "+absent];
+    let lines=[dateHeader(), "P"+c.title+" "+presentCount+"/"+total+" vắng "+absent];
     perClass.forEach(p=>{ if(p.absentNames.length) lines.push(p.grp+": "+p.absentNames.join(", ")); });
     setReport(lines.join("\n"));
   }
   savePresent(activeId); saveRoster(activeId);
+}
+/* Dòng "Thứ …, dd/mm/yyyy" theo ngày đang chọn ở ô lịch */
+function dateHeader(){
+  const v=$("#dateInput").value;
+  let d;
+  if(v){ const [y,m,day]=v.split("-").map(Number); d=new Date(y, m-1, day); }
+  else { d=new Date(); }
+  const thu=["Chủ nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Thứ Bảy"][d.getDay()];
+  const dd=String(d.getDate()).padStart(2,"0"), mm=String(d.getMonth()+1).padStart(2,"0");
+  return thu+", ngày "+dd+"/"+mm+"/"+d.getFullYear();
 }
 function stat(cls,k,v){ return `<div class="stat ${cls}"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
 function mini(k,v){ return `<div class="mini"><div class="k">${k}</div><div class="v">${v}</div></div>`; }
@@ -512,6 +531,11 @@ function boot(){
   renderTabs(); render();
 }
 boot();
+
+/* ---------- Đăng ký Service Worker (chạy offline như app) ---------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+}
 </script>
 </body>
 </html>
