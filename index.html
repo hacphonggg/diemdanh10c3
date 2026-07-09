@@ -40,6 +40,15 @@
   .tab:hover{color:var(--brand-d)}
   .tab.active{color:var(--brand-d);border-color:var(--line);border-bottom:3px solid var(--brand);box-shadow:0 -2px 8px rgba(16,24,40,.04)}
 
+  /* Thanh trạng thái đồng bộ */
+  .syncbar{margin-top:10px;font-size:12.5px;font-weight:600;padding:8px 12px;border-radius:10px;background:#eef2ff;color:#3730a3;border:1px solid #e0e7ff}
+  .syncbar.off{background:#f1f5f9;color:#64748b;border-color:#e2e8f0}
+  .syncbar.ok{background:#dcfce7;color:#15803d;border-color:#bbf7d0}
+  .syncbar.err{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
+  .fbcfg{display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:100%;margin-top:4px}
+  .fbcfg input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:inherit;outline:none}
+  .fbcfg input:focus{border-color:var(--brand)}
+
   .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:16px;box-shadow:0 2px 10px rgba(16,24,40,.04)}
   .card:first-of-type{border-top-left-radius:0}
   .card h2{margin:0 0 12px;font-size:16px;display:flex;align-items:center;gap:8px}
@@ -139,6 +148,7 @@
   </header>
 
   <div class="tabs" id="tabs"></div>
+  <div class="syncbar off" id="syncStatus"></div>
 
   <!-- 1. Danh sách + điểm danh -->
   <section class="card">
@@ -153,6 +163,11 @@
       <label class="btn btn-ghost" for="fileInput">📥 Import Excel</label>
       <input type="file" id="fileInput" accept=".xlsx,.xls">
       <button class="btn btn-soft" id="resetList">↩️ Đặt lại danh sách gốc</button>
+      <div class="fbcfg">
+        <input id="fbUrl" placeholder="Dán link Firebase (Realtime Database URL) để đồng bộ nhiều máy...">
+        <button class="btn btn-primary" id="fbSave">🔗 Bật đồng bộ</button>
+        <button class="btn btn-soft" id="fbClear">Tắt</button>
+      </div>
     </div>
     <div class="edit-note">✏️ Đang ở chế độ sửa: gõ để đổi tên, sửa nhóm/lớp, bấm 🗑 để xóa, hoặc thêm học sinh ở khung dưới. Xong bấm <b>Xong</b>.</div>
     <table class="list">
@@ -241,29 +256,42 @@ function buildStudent(id, ho, ten, grp){
   return {id, ho, ten, grp, full, short};
 }
 
-/* ---------- Nạp roster cho 1 tab ---------- */
-function loadRoster(id){
-  const c=cfg(id);
-  let src=c.students, ver=c.ver;
-  try{
-    const raw=localStorage.getItem("dd_roster_"+id);
-    if(raw){ const p=JSON.parse(raw); if(p && p.students && p.students.length && (p.ver||0) >= c.ver){ src=p.students; } }
-  }catch(e){}
+/* ---------- Nạp roster cho 1 tab (config + bản lưu cục bộ) ---------- */
+function makeStudents(list){
   let idSeq=1;
-  const students=src.map(s=>{
-    const sid=(typeof s.id==="number")?s.id:idSeq;
-    if(sid>=idSeq) idSeq=sid+1;
+  const arr=(list||[]).map(s=>{
+    const sid=(typeof s.id==="number")?s.id:idSeq; if(sid>=idSeq) idSeq=sid+1;
     return buildStudent(sid, s.ho, s.ten, s.grp!==undefined?s.grp:(s.cd||s.lop));
   });
-  RT[id]={students, present:{}, loadedKey:"", idSeq};
+  return {arr, idSeq};
 }
-function saveRoster(id){
+function loadRoster(id){
+  const c=cfg(id);
+  let src=c.students, updatedAt=0;
+  try{
+    const raw=localStorage.getItem("dd_roster_"+id);
+    if(raw){ const p=JSON.parse(raw);
+      const pv=(p.cfgVer!=null?p.cfgVer:(p.ver||0));
+      if(p && p.students && p.students.length && pv >= c.ver){ src=p.students; updatedAt=p.updatedAt||0; }
+    }
+  }catch(e){}
+  const {arr, idSeq}=makeStudents(src);
+  const prev=RT[id]||{};
+  RT[id]={students:arr, present:{}, loadedKey:"", idSeq, updatedAt, _es:prev._es||null};
+}
+function saveRosterLocal(id){
   const st=RT[id];
   try{
     localStorage.setItem("dd_roster_"+id, JSON.stringify({
-      ver:cfg(id).ver, students:st.students.map(s=>({id:s.id,ho:s.ho,ten:s.ten,grp:s.grp}))
+      cfgVer:cfg(id).ver, updatedAt:st.updatedAt||0,
+      students:st.students.map(s=>({id:s.id,ho:s.ho,ten:s.ten,grp:s.grp}))
     }));
   }catch(e){}
+}
+/* Gọi khi danh sách bị THAY ĐỔI (thêm/xóa/sửa) -> lưu + đẩy lên đám mây */
+function rosterChanged(id){
+  const st=RT[id]; st.updatedAt=Date.now();
+  saveRosterLocal(id); pushRemote(id);
 }
 
 /* ---------- Điểm danh (present) theo tab + ngày ---------- */
@@ -276,6 +304,98 @@ function ensurePresent(id){
   st.loadedKey=key;
 }
 function savePresent(id){ try{ localStorage.setItem(presentKey(id), JSON.stringify(RT[id].present)); }catch(e){} }
+
+/* ================= ĐỒNG BỘ FIREBASE (Realtime Database) =================
+   Bật bằng cách dán link Realtime Database (trong ✏️ Sửa danh sách), hoặc điền sẵn
+   vào FIREBASE_DB_URL bên dưới để mọi máy tự đồng bộ mà không cần nhập.
+   Chỉ đồng bộ DANH SÁCH lớp; điểm danh mỗi ngày vẫn lưu riêng từng máy.        */
+const FIREBASE_DB_URL = "https://diemdanh10c3-default-rtdb.asia-southeast1.firebasedatabase.app";
+const pendingRemote = {};
+function effectiveDbUrl(){
+  let u="";
+  try{ u=localStorage.getItem("dd_fb_url")||""; }catch(e){}
+  return (u||FIREBASE_DB_URL||"").replace(/\/+$/,"");
+}
+function syncOn(){ return !!effectiveDbUrl(); }
+function fbNodeUrl(id){ return effectiveDbUrl()+"/rosters/"+id+".json"; }
+
+function setSyncStatus(state){
+  const el=$("#syncStatus"); if(!el) return;
+  if(!syncOn()){ el.className="syncbar off"; el.textContent="⚪ Chưa bật đồng bộ (danh sách chỉ lưu trên máy này). Mở ✏️ Sửa danh sách để bật."; return; }
+  const map={
+    connecting:["syncbar","🔄 Đang kết nối đồng bộ…"],
+    ok:["syncbar ok","☁️ Đã bật đồng bộ – danh sách tự cập nhật giữa các máy"],
+    saving:["syncbar","⏳ Đang lưu lên đám mây…"],
+    err:["syncbar err","⚠️ Chưa kết nối được (kiểm tra lại link Firebase hoặc mạng)"]
+  };
+  const [cls,txt]=map[state]||map.ok; el.className=cls; el.textContent=txt;
+}
+
+function pushRemote(id){
+  if(!syncOn()) return;
+  const st=RT[id];
+  if(!st.updatedAt) st.updatedAt=Date.now();
+  const body=JSON.stringify({
+    cfgVer:cfg(id).ver, updatedAt:st.updatedAt,
+    students:st.students.map(s=>({id:s.id,ho:s.ho,ten:s.ten,grp:s.grp}))
+  });
+  setSyncStatus("saving");
+  fetch(fbNodeUrl(id),{method:"PUT",body}).then(r=>setSyncStatus(r.ok?"ok":"err")).catch(()=>setSyncStatus("err"));
+}
+
+/* Nhận danh sách từ đám mây nếu mới hơn cái đang có */
+function applyRemote(id, remote){
+  const c=cfg(id), st=RT[id];
+  if(!remote || !remote.students || !remote.students.length) return false;
+  if((remote.cfgVer||0) < c.ver) return false;              // thuộc phiên bản gốc cũ hơn
+  if((remote.updatedAt||0) <= (st.updatedAt||0)) return false; // không mới hơn
+  if(editMode && activeId===id){ pendingRemote[id]=remote; return false; } // đang sửa: để lát áp dụng
+  const {arr, idSeq}=makeStudents(remote.students);
+  st.students=arr; st.idSeq=idSeq; st.updatedAt=remote.updatedAt||0;
+  saveRosterLocal(id);
+  if(activeId===id) render();
+  return true;
+}
+
+async function syncTab(id){
+  if(!syncOn()) return;
+  let remote=null;
+  try{ const r=await fetch(fbNodeUrl(id),{cache:"no-store"}); if(r.ok){ remote=await r.json(); setSyncStatus("ok"); } else setSyncStatus("err"); }
+  catch(e){ setSyncStatus("err"); }
+  const c=cfg(id), st=RT[id];
+  const rUpd=remote&&remote.updatedAt||0, rVer=remote&&remote.cfgVer||0;
+  const remoteValid = remote && remote.students && remote.students.length && rVer>=c.ver;
+  if(remoteValid && rUpd>(st.updatedAt||0)){
+    applyRemote(id, remote);
+  } else if(!remoteValid || (st.updatedAt||0)>rUpd || c.ver>rVer){
+    pushRemote(id);   // của mình mới hơn / remote thiếu-cũ / vừa cập nhật phiên bản gốc
+  }
+  startStream(id);
+}
+
+/* Realtime: lắng nghe thay đổi tức thì qua SSE của Firebase */
+function startStream(id){
+  if(!window.EventSource || !syncOn()) return;
+  const st=RT[id];
+  if(st._es){ try{ st._es.close(); }catch(e){} st._es=null; }
+  try{
+    const es=new EventSource(fbNodeUrl(id));
+    es.addEventListener("put", ev=>{
+      let d; try{ d=JSON.parse(ev.data); }catch(e){ return; }
+      if(!d) return;
+      if(d.path==="/") applyRemote(id, d.data); else syncTab(id);
+    });
+    es.onerror=()=>{}; // EventSource tự kết nối lại
+    st._es=es;
+  }catch(e){}
+}
+function stopStreams(){ Object.values(RT).forEach(st=>{ if(st._es){ try{st._es.close();}catch(e){} st._es=null; } }); }
+
+function initSync(){
+  if(!syncOn()){ setSyncStatus("off"); return; }
+  setSyncStatus("connecting");
+  TABS.forEach(t=>syncTab(t.id));
+}
 
 /* ---------- Badge màu cho nhóm ---------- */
 const PALETTE=[["#e0e7ff","#4338ca"],["#dcfce7","#15803d"],["#ffe4e6","#be123c"],["#cffafe","#0e7490"],["#fef9c3","#a16207"],["#fae8ff","#a21caf"]];
@@ -407,7 +527,7 @@ function update(){
     perClass.forEach(p=>{ if(p.absentNames.length) lines.push(p.grp+": "+p.absentNames.join(", ")); });
     setReport(lines.join("\n"));
   }
-  savePresent(activeId); saveRoster(activeId);
+  savePresent(activeId);
 }
 /* Dòng "Thứ …, dd/mm/yyyy" theo ngày đang chọn ở ô lịch */
 function dateHeader(){
@@ -435,15 +555,15 @@ $("#rows").addEventListener("change", e=>{
     update(); return;
   }
   const grp=e.target.closest(".edit-grp");
-  if(grp){ const s=byId(+grp.dataset.id); if(s){ s.grp=(grp.value||"").toUpperCase().replace(/\s/g,""); s.short=buildStudent(s.id,s.ho,s.ten,s.grp).short; render(); } return; }
+  if(grp){ const s=byId(+grp.dataset.id); if(s){ s.grp=(grp.value||"").toUpperCase().replace(/\s/g,""); s.short=buildStudent(s.id,s.ho,s.ten,s.grp).short; rosterChanged(activeId); render(); } return; }
   const nm=e.target.closest("input.edit-name");
-  if(nm){ const s=byId(+nm.dataset.id); if(s){ const {ho,ten}=splitName(nm.value); const b=buildStudent(s.id,ho,ten,s.grp); s.ho=b.ho; s.ten=b.ten; s.full=b.full; s.short=b.short; update(); } }
+  if(nm){ const s=byId(+nm.dataset.id); if(s){ const {ho,ten}=splitName(nm.value); const b=buildStudent(s.id,ho,ten,s.grp); s.ho=b.ho; s.ten=b.ten; s.full=b.full; s.short=b.short; rosterChanged(activeId); update(); } }
 });
 $("#rows").addEventListener("click", e=>{
   const b=e.target.closest("button.del"); if(!b) return;
   const s=byId(+b.dataset.id); if(!s) return;
   if(confirm("Xóa học sinh: "+s.full+" ?")){
-    const st=cur(); st.students=st.students.filter(x=>x.id!==s.id); delete st.present[s.id]; render();
+    const st=cur(); st.students=st.students.filter(x=>x.id!==s.id); delete st.present[s.id]; rosterChanged(activeId); render();
   }
 });
 function byId(id){ return cur().students.find(s=>s.id===id); }
@@ -457,17 +577,34 @@ $("#addBtn").addEventListener("click", ()=>{
   const st=cur();
   st.students.push(buildStudent(st.idSeq++, ho, ten, grp));
   $("#newName").value=""; $("#newName").focus();
-  render(); toast("✅ Đã thêm "+name);
+  rosterChanged(activeId); render(); toast("✅ Đã thêm "+name);
 });
 $("#newName").addEventListener("keydown", e=>{ if(e.key==="Enter") $("#addBtn").click(); });
 
 /* Bật/tắt sửa, đặt lại */
-$("#editToggle").addEventListener("click", ()=>{ editMode=!editMode; render(); });
+$("#editToggle").addEventListener("click", ()=>{
+  editMode=!editMode;
+  if(!editMode && pendingRemote[activeId]){ const r=pendingRemote[activeId]; delete pendingRemote[activeId]; applyRemote(activeId, r); }
+  render();
+});
 $("#resetList").addEventListener("click", ()=>{
   if(confirm("Đặt lại danh sách gốc của tab này? Mọi chỉnh sửa trên máy này sẽ mất.")){
     try{ localStorage.removeItem("dd_roster_"+activeId); }catch(e){}
-    loadRoster(activeId); render(); toast("Đã đặt lại danh sách gốc.");
+    loadRoster(activeId); rosterChanged(activeId); render(); toast("Đã đặt lại danh sách gốc.");
   }
+});
+
+/* Bật/tắt đồng bộ Firebase */
+$("#fbSave").addEventListener("click", ()=>{
+  let u=$("#fbUrl").value.trim();
+  if(!u){ toast("Hãy dán link Firebase trước."); return; }
+  u=u.replace(/\/+$/,"");
+  try{ localStorage.setItem("dd_fb_url",u); }catch(e){}
+  stopStreams(); initSync(); toast("✅ Đã bật đồng bộ"); render();
+});
+$("#fbClear").addEventListener("click", ()=>{
+  try{ localStorage.removeItem("dd_fb_url"); }catch(e){}
+  stopStreams(); setSyncStatus("off"); $("#fbUrl").value=""; toast("Đã tắt đồng bộ trên máy này");
 });
 
 /* Nút chung */
@@ -499,7 +636,7 @@ $("#fileInput").addEventListener("change", e=>{
       const st=cur(); let idSeq=1;
       st.students=students.map(s=>buildStudent(idSeq++, s.ho, s.ten, s.grp));
       st.idSeq=idSeq; st.present={};
-      render(); toast("✅ Đã tải "+st.students.length+" học sinh vào tab này");
+      rosterChanged(activeId); render(); toast("✅ Đã tải "+st.students.length+" học sinh vào tab này");
     }catch(err){ console.error(err); toast("Lỗi đọc file Excel."); }
   };
   reader.readAsArrayBuffer(file); e.target.value="";
@@ -529,8 +666,14 @@ function boot(){
   $("#dateInput").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   TABS.forEach(t=>loadRoster(t.id));
   renderTabs(); render();
+  const fu=$("#fbUrl"); if(fu) fu.value=effectiveDbUrl();
+  initSync();
 }
 boot();
+
+/* Đồng bộ lại khi có mạng trở lại hoặc mở lại app */
+window.addEventListener("online", ()=>{ if(syncOn()) TABS.forEach(t=>syncTab(t.id)); });
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden && syncOn()) TABS.forEach(t=>syncTab(t.id)); });
 
 /* ---------- Đăng ký Service Worker (chạy offline như app) ---------- */
 if("serviceWorker" in navigator){
